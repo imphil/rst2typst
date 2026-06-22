@@ -1,0 +1,4 @@
+Clicking on this internal hyperlink will take us to the #link(<target>)[target] below.
+<target>
+
+The hyperlink target above points to this paragraph.

@@ -1,0 +1,5 @@
+.. _Python: https://www.python.org/
+
+.. _Python DOT ORG: Python_
+
+This is a `Python DOT ORG`_ reference.

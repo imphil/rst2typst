@@ -666,8 +666,19 @@ class TypstTranslator(nodes.NodeVisitor):
         self.body.append("]")
 
     def visit_target(self, node: nodes.target):
-        # TODO: Currently, it doesn't support internal reference.
-        pass
+        # Handle internal hyperlink targets
+        # External targets (with refuri) are handled separately and don't need labels
+        if "refuri" in node:
+            # External hyperlink target - skip, handled by reference nodes
+            raise nodes.SkipNode
+
+        # Internal target - output as Typst label
+        if "refid" in node or "ids" in node:
+            # Get the target ID
+            target_id = node.get("refid") or (node["ids"][0] if node["ids"] else None)
+            if target_id:
+                self.body.append(f"<{target_id}>\n")
+        raise nodes.SkipNode
 
     def depart_target(self, node: nodes.target):
         pass
