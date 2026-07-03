@@ -190,11 +190,13 @@ class TypstTranslator(nodes.NodeVisitor):
                 n_ = n_.parent
             return False
 
+        in_literal = _in_literal(node)
         lines = [
-            escape(line) if not _in_literal(node) else line
+            escape(line) if not in_literal else line
             for line in node.astext().split("\n")
         ]
-        self.body.append(f"\n{self._hi.indent}".join(lines))
+        separator = "\n" if in_literal else f"\n{self._hi.indent}"
+        self.body.append(separator.join(lines))
 
     def depart_Text(self, node: nodes.Text):
         pass
