@@ -1,2 +1,4 @@
 # These files are for check doctree of test cases.
 *.pxml
+# Rendered by `pytest --render-pdfs`.
+*.pdf

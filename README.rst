@@ -80,6 +80,15 @@ Use as library
 
 (TBD)
 
+Development
+===========
+
+Run all spec tests with PDFs for eyeballing
+
+```
+pytest tests/test_spec.py --render-spec-pdfs
+```
+
 License
 =======
 

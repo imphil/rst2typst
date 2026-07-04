@@ -45,7 +45,7 @@ def pytest_generate_tests(metafunc):
     metafunc.parametrize("source,expected,pxml", all_cases, ids=ids)
 
 
-def test_translate(source: str, expected: str, pxml: Path):
+def test_translate(source: str, expected: str, pxml: Path, render_pdfs: bool):
     """Test result of translation.
 
     It checks that contents of ``self.body.append`` results match expected output.
@@ -57,3 +57,9 @@ def test_translate(source: str, expected: str, pxml: Path):
     pxml.write_bytes(publish_string(source, writer_name="pseudoxml"))
     parts = publish_parts(source, writer=writer.Writer())
     assert parts["body"].strip() == expected.strip()
+
+    if render_pdfs:
+        from rst2typst.pdf import Writer as PdfWriter
+
+        pdf_bytes = publish_string(source, writer=PdfWriter())
+        pxml.with_suffix(".pdf").write_bytes(pdf_bytes)
