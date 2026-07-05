@@ -1,0 +1,11 @@
+.. table:: Truth table constrained to half the page width
+   :width: 50%
+
+   =====  =====  =======
+     A      B    A and B
+   =====  =====  =======
+   False  False  False
+   True   False  False
+   False  True   False
+   True   True   True
+   =====  =====  =======

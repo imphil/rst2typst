@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import functools
+import re
 from importlib import metadata
 from pathlib import Path
 from typing import TYPE_CHECKING
@@ -141,6 +142,34 @@ def escape(text: str) -> str:
     if text and text[0] in HEAD_ESCAPE_TARGET:
         text = "\\" + text
     return text
+
+
+# Conversion factors to Typst units for docutils length units that Typst has
+# no literal for. "px" and unitless (docutils' legacy HTML <table width=N>
+# convention, i.e. pixels) both use the CSS reference pixel (96px = 1in =
+# 72pt); "pc" (pica) is a fixed 12pt; "ex" has no fixed size, so it's
+# approximated as half an em, the common CSS convention.
+_LENGTH_UNIT_CONVERSION = {
+    "": (0.75, "pt"),
+    "px": (0.75, "pt"),
+    "pc": (12, "pt"),
+    "ex": (0.5, "em"),
+}
+
+
+def _typst_length(value: str) -> str:
+    """Convert a docutils length/percentage string (e.g. from ``:width:``) to Typst.
+
+    Percentages and the units Typst has a literal for (pt, mm, cm, in, em)
+    are passed through unchanged; the rest are converted via
+    :data:`_LENGTH_UNIT_CONVERSION`.
+    """
+    match = re.match(r"^([0-9.]+)([a-z%]*)$", value)
+    number, unit = match.group(1), match.group(2)
+    if unit not in _LENGTH_UNIT_CONVERSION:
+        return value
+    factor, typst_unit = _LENGTH_UNIT_CONVERSION[unit]
+    return f"{float(number) * factor:g}{typst_unit}"
 
 
 # Node types whose children hang off an indent that the container itself
@@ -624,6 +653,13 @@ class TypstTranslator(nodes.NodeVisitor):
         # continuation line and always needs its own indent.
         if self.needs_leading_gap(node):
             self.body.append(f"\n{self._hi.indent}")
+        # Typst's table() has no overall-width parameter (only per-column
+        # sizing), so an explicit ":width:" is applied by wrapping the whole
+        # thing (figure and all, if captioned) in a sized block.
+        if "width" in node:
+            self.body.append(f"#block(width: {_typst_length(node['width'])})[\n")
+            self._hi.push("  ")
+            self.body.append(self._hi.indent)
         figure_opts = {}
         if isinstance(node.children[0], nodes.title):
             figure_opts["caption"] = node.children[0].astext()
@@ -646,7 +682,11 @@ class TypstTranslator(nodes.NodeVisitor):
             if "caption" in opts:
                 self.body.append(f"\n{self._hi.indent}caption: [{opts['caption']}],\n")
             self._hi.pop()
-            self.body.append(")")
+            self.body.append(f"{self._hi.indent})")
+        if "width" in node:
+            self.body.append("\n")
+            self._hi.pop()
+            self.body.append(f"{self._hi.indent}]")
         self.body.append("\n")
 
     def visit_tgroup(self, node: nodes.tgroup):

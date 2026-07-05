@@ -1,0 +1,25 @@
+#block(width: 50%)[
+  #figure([
+    #table(
+      columns: 3,
+      table.header(
+        [A],
+        [B],
+        [A and B],
+      ),
+      [False],
+      [False],
+      [False],
+      [True],
+      [False],
+      [False],
+      [False],
+      [True],
+      [False],
+      [True],
+      [True],
+      [True],
+    )],
+    caption: [Truth table constrained to half the page width],
+  )
+]

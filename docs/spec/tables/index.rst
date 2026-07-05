@@ -122,6 +122,17 @@ Grid table with "grid" widths keyword
    .. literalinclude:: grid-table-with-widths.typ.txt
       :language: typst
 
+Simple table with an overall width
+-----------------------------------
+
+.. tab-set-code::
+
+   .. literalinclude:: simple-table-with-overall-width.rst.txt
+      :language: rst
+
+   .. literalinclude:: simple-table-with-overall-width.typ.txt
+      :language: typst
+
 References
 ==========
 
