@@ -143,7 +143,45 @@ def escape(text: str) -> str:
     return text
 
 
+# Node types whose children hang off an indent that the container itself
+# already establishes (a list marker, "#quote(...)[", "#footnote()[", ...).
+# Typst needs a blank line between such sibling blocks, but not before the
+# first child (the container's own opening already positions it) or after
+# the last (its closing does).
+_GAP_CONTAINERS_DEFAULT = (
+    nodes.list_item,
+    nodes.definition,
+    nodes.field_body,
+    nodes.block_quote,
+    nodes.footnote,
+    nodes.Admonition,
+    nodes.entry,
+)
+
+# Node types that render as their own indented block and so participate in
+# the gap protocol above, as opposed to purely inline content.
+_GAP_ELIGIBLE_DEFAULT = (
+    nodes.paragraph,
+    nodes.literal_block,
+    nodes.doctest_block,
+    nodes.math_block,
+    nodes.block_quote,
+    nodes.Admonition,
+    nodes.table,
+    nodes.bullet_list,
+    nodes.enumerated_list,
+)
+
+
+
+
 class TypstTranslator(nodes.NodeVisitor):
+    """Translator from docutils to Typst.
+
+    Subclasses can override :meth:`get_gap_containers` and :meth:`get_gap_eligible`
+    to extend the gap protocol with custom node types (e.g., Sphinx nodes).
+    """
+
     def __init__(self, document: nodes.document):
         super().__init__(document)
         # Properties that are used by external object.
@@ -153,6 +191,50 @@ class TypstTranslator(nodes.NodeVisitor):
         # Properties to handle content for translation.
         self._section_level = 0
         self._hi = HanglingIndent()
+
+    @classmethod
+    def get_gap_containers(cls) -> tuple:
+        """Node types that are gap containers (hold block-level children).
+
+        Override in subclasses to extend the gap protocol to custom nodes.
+        """
+        return _GAP_CONTAINERS_DEFAULT
+
+    @classmethod
+    def get_gap_eligible(cls) -> tuple:
+        """Node types that are gap-eligible (block-level content).
+
+        Override in subclasses to extend the gap protocol to custom nodes.
+        """
+        return _GAP_ELIGIBLE_DEFAULT
+
+    def needs_leading_gap(self, node: nodes.Element) -> bool:
+        """Whether a blank-line gap is needed before ``node``.
+
+        True for a node in :meth:`get_gap_eligible` that is a non-first child of a
+        node in :meth:`get_gap_containers`. Subclasses can override
+        :meth:`get_gap_containers` and :meth:`get_gap_eligible` to extend.
+        """
+        parent = node.parent
+        return (
+            isinstance(node, self.get_gap_eligible())
+            and isinstance(parent, self.get_gap_containers())
+            and parent.children[0] is not node
+        )
+
+    def needs_trailing_gap(self, node: nodes.Element) -> bool:
+        """Whether a blank-line gap is needed after ``node``.
+
+        Only paragraphs need this: every other node in :meth:`get_gap_eligible`
+        already ends its own markup with a newline, which provides the first half
+        of the next gap.
+        """
+        parent = node.parent
+        return (
+            isinstance(node, nodes.paragraph)
+            and isinstance(parent, self.get_gap_containers())
+            and parent.children[-1] is not node
+        )
 
     @functools.cached_property
     def local_package_name(self) -> str:
@@ -255,29 +337,31 @@ class TypstTranslator(nodes.NodeVisitor):
     # =============
     @block_on_structural
     def visit_paragraph(self, node: nodes.paragraph):
-        pass
+        if self.needs_leading_gap(node):
+            self.body.append(f"\n{self._hi.indent}")
 
     @block_on_structural
     def depart_paragraph(self, node: nodes.paragraph):
-        pass
+        if self.needs_trailing_gap(node):
+            self.body.append("\n")
 
     # Bullet Lists and Enumerated Lists
     # ---------------------------------
     # Refs: https://typst.app/docs/reference/model/list/
     @block_on_structural
     def visit_bullet_list(self, node: nodes.bullet_list):
-        self._hi.push("- ")
-        if isinstance(node.parent, nodes.list_item):
+        if self.needs_leading_gap(node):
             self.body.append("\n")
+        self._hi.push("- ")
 
     def depart_bullet_list(self, node: nodes.bullet_list):
         self._hi.pop()
 
     @block_on_structural
     def visit_enumerated_list(self, node: nodes.enumerated_list):
-        self._hi.push("+ ")
-        if isinstance(node.parent, nodes.list_item):
+        if self.needs_leading_gap(node):
             self.body.append("\n")
+        self._hi.push("+ ")
 
     def depart_enumerated_list(self, node: nodes.enumerated_list):
         self._hi.pop()
@@ -463,6 +547,11 @@ class TypstTranslator(nodes.NodeVisitor):
     # --------------
     # Refs: https://typst.app/docs/reference/text/raw/
     def visit_literal_block(self, node: nodes.literal_block):
+        # The hanging indent is only needed for the fence: the first child of
+        # a hanging container already sits right after its opening marker,
+        # which reserves the same width as the indent would add.
+        if self.needs_leading_gap(node):
+            self.body.append(f"\n{self._hi.indent}")
         # NOTE: It finds the highlighting language using the "language" attribute set by transforms.
         lang = node.get("language", None)
         if lang:
@@ -471,14 +560,17 @@ class TypstTranslator(nodes.NodeVisitor):
         self.body.append("```\n")
 
     def depart_literal_block(self, node: nodes.literal_block):
-        self.body.append("\n```\n\n")
+        self.body.append(f"\n{self._hi.indent}```\n")
 
     # Math
     # ----
     @block_on_structural
     def visit_math_block(self, node: nodes.math):
+        # See visit_literal_block for why this is conditional on position.
+        if self.needs_leading_gap(node):
+            self.body.append(f"\n{self._hi.indent}")
         self.packages.add(f"@preview/mitex:{MITEX_VERSION}")
-        self.body.append(f"{self._hi.indent}#mitex(`\n")
+        self.body.append("#mitex(`\n")
         self._hi.push("  ")
         self.body.append(self._hi.indent)
 
@@ -495,6 +587,8 @@ class TypstTranslator(nodes.NodeVisitor):
     # Refs: https://typst.app/docs/reference/model/quote/
     @block_on_structural
     def visit_block_quote(self, node: nodes.block_quote):
+        if self.needs_leading_gap(node):
+            self.body.append(f"\n{self._hi.indent}")
         self._hi.push("  ")
         args = []
         attrs = list(node.findall(nodes.attribution))
@@ -512,15 +606,24 @@ class TypstTranslator(nodes.NodeVisitor):
     # Doctest Blocks
     # --------------
     def visit_doctest_block(self, node: nodes.doctest_block):
+        # See visit_literal_block for why the indent is conditional.
+        if self.needs_leading_gap(node):
+            self.body.append(f"\n{self._hi.indent}")
         self.body.append("```python\n")
 
     def depart_doctest_block(self, node: nodes.doctest_block):
-        self.body.append("\n```\n\n")
+        self.body.append(f"\n{self._hi.indent}```\n")
 
     # Tables
     # ------
     @block_on_structural
     def visit_table(self, node: nodes.table):
+        # See visit_literal_block for why the indent is conditional. Only the
+        # first line written (the figure wrapper if present, otherwise the
+        # table itself) needs this; a "#table(" following "#figure([" is a
+        # continuation line and always needs its own indent.
+        if self.needs_leading_gap(node):
+            self.body.append(f"\n{self._hi.indent}")
         figure_opts = {}
         if isinstance(node.children[0], nodes.title):
             figure_opts["caption"] = node.children[0].astext()
@@ -529,7 +632,9 @@ class TypstTranslator(nodes.NodeVisitor):
             node["figure_opts"] = figure_opts
             self.body.append("#figure([\n")
             self._hi.push("  ")
-        self.body.append(f"{self._hi.indent}#table(\n")
+            self.body.append(f"{self._hi.indent}#table(\n")
+        else:
+            self.body.append("#table(\n")
         self._hi.push("  ")
 
     def depart_table(self, node: nodes.table):
@@ -718,13 +823,15 @@ class TypstTranslator(nodes.NodeVisitor):
             nonlocal title
             if isinstance(node.parent, nodes.Structural):
                 self.body.append("\n")
+            elif self.needs_leading_gap(node):
+                self.body.append(f"\n{self._hi.indent}")
 
             title_idx = node.first_child_matching_class(nodes.title)
             if title_idx is not None:
                 title = node.children[title_idx].astext()
                 node.remove(node.children[title_idx])
 
-            self.body.append(f"{self._hi.indent}#admonition(\n")
+            self.body.append("#admonition(\n")
             self._hi.push("  ")
             self.body.append(f'{self._hi.indent}"{node_name}", "{title}",\n')
             self.body.append(f"{self._hi.indent}[")

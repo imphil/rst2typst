@@ -1,7 +1,8 @@
-+ First item.```bash
++ First item.
+
+  ```bash
 # comment
 top
-```
-
+  ```
 
 + Second item.
