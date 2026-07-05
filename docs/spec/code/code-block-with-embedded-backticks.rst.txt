@@ -1,0 +1,6 @@
+.. code-block::
+
+   ```{mermaid}
+   flowchart TD
+       A --> B
+   ```

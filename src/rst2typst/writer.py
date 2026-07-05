@@ -583,13 +583,24 @@ class TypstTranslator(nodes.NodeVisitor):
             self.body.append(f"\n{self._hi.indent}")
         # NOTE: It finds the highlighting language using the "language" attribute set by transforms.
         lang = node.get("language", None)
+        # Choose a fence length longer than the longest backtick run in the
+        # content so that embedded ``` sequences don't terminate the fence
+        # prematurely (Typst, like CommonMark, supports longer opening fences).
+        content = node.astext()
+        max_run = max(
+            (len(m.group()) for m in re.finditer(r"`+", content)),
+            default=0,
+        )
+        fence = "`" * max(3, max_run + 1)
+        self._literal_block_fence = fence
         if lang:
-            self.body.append(f"```{lang}\n")
+            self.body.append(f"{fence}{lang}\n")
             return
-        self.body.append("```\n")
+        self.body.append(f"{fence}\n")
 
     def depart_literal_block(self, node: nodes.literal_block):
-        self.body.append(f"\n{self._hi.indent}```\n")
+        fence = getattr(self, "_literal_block_fence", "```")
+        self.body.append(f"\n{self._hi.indent}{fence}\n")
 
     # Math
     # ----
