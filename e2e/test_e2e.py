@@ -2,7 +2,7 @@
 
 from pathlib import Path
 
-import fitz
+import pymupdf
 import pytest
 
 from conftest import FIXTURES_DIR
@@ -14,13 +14,13 @@ def test_no_text_overlap(source: Path, open_pdf):
 
     Verify that no two text blocks on the same page overlap each other.
     """
-    doc: fitz.Document = open_pdf(source)
+    doc: pymupdf.Document = open_pdf(source)
     for page in doc:
         blocks = [b for b in page.get_text("blocks") if b[6] == 0]
         for i, b1 in enumerate(blocks):
-            r1 = fitz.Rect(b1[:4])
+            r1 = pymupdf.Rect(b1[:4])
             for b2 in blocks[i + 1 :]:
-                r2 = fitz.Rect(b2[:4])
+                r2 = pymupdf.Rect(b2[:4])
                 assert (r1 & r2).is_empty, (
                     f"Text blocks overlap on page {page.number + 1}:\n"
                     f"  Block 1: {b1[4]!r} at {r1}\n"

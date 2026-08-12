@@ -3,7 +3,7 @@
 import subprocess
 from pathlib import Path
 
-import fitz
+import pymupdf
 import pytest
 
 FIXTURES_DIR = Path(__file__).parent / "fixtures"
@@ -37,8 +37,8 @@ def build_pdf(tmp_path_factory):
 
 @pytest.fixture(scope="session")
 def open_pdf(build_pdf):
-    def _open(rst_path: Path) -> fitz.Document:
+    def _open(rst_path: Path) -> pymupdf.Document:
         pdf_path = build_pdf(rst_path)
-        return fitz.open(str(pdf_path))
+        return pymupdf.open(str(pdf_path))
 
     return _open
