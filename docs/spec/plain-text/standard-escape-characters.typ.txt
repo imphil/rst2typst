@@ -7,3 +7,5 @@ Target to escape are ...
 - Underscore (\_) is mark for emphasized text.
 - Backtick (\`) is mark for raw text.
 - Tilde (\~) represents a non-breaking space.
+- Closing square brackets (\]) confuse the parser.
+- Opening square brackets (\]) confuse the parser as well.

@@ -135,7 +135,7 @@ class HanglingIndent(list[str]):
 
 def escape(text: str) -> str:
     """Escape special characters in Typst."""
-    ANY_ESCAPE_TARGET = ["#", "$", "*", "<", ">", "\\", "_", "`", "~"]
+    ANY_ESCAPE_TARGET = ["#", "$", "*", "<", ">", "\\", "_", "`", "~", "[", "]"]
     HEAD_ESCAPE_TARGET = ["+", "-", "="]
     trans = str.maketrans({c: f"\\{c}" for c in ANY_ESCAPE_TARGET})
     text = text.translate(trans)
